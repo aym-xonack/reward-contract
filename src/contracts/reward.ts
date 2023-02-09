@@ -1,41 +1,45 @@
 import {
+    assert,
     method,
+    PubKey,
     prop,
     SmartContract,
-    hash256,
-    assert,
+    Sig,
     bsv,
-    UTXO,
-    Sig
 } from 'scrypt-ts'
+import { UTXO } from '../types'
 
 export class Reward extends SmartContract {
+    private balance: number
 
     @prop()
-    owner: PubKey;
+    owner: PubKey
 
     @prop()
-    aym: PubKey;
+    aym: PubKey
 
     @prop()
-    deadline: bigint;  //UNIX time
+    deadline: bigint //UNIX time
 
     @prop()
-    abandoned: bigint;  //UNIX time
+    abandoned: bigint //UNIX time
 
     constructor(owner: PubKey, aym: PubKey, deadline: bigint) {
         super(owner, aym, deadline)
 
-        this.owner = owner;
-        this.aym = aym;
-        this.deadline = deadline; //UNIX time
-        this.abandonded = deadline + 86400;
+        this.owner = owner
+        this.aym = aym
+        this.deadline = deadline //UNIX time
+        this.abandoned = deadline + 86400n
     }
 
     @method()
-    public multisig(userSig: Sig, aymSig: Sig){
-        assert(this.checkSig(userSig, this.owner), 'wrong signiture for bounty owner.')
-        assert(this.checkSig(), 'wrong Aym signature')
+    public multisig(userSig: Sig, aymSig: Sig) {
+        assert(
+            this.checkSig(userSig, this.owner),
+            'wrong signiture for bounty owner.'
+        )
+        assert(this.checkSig(aymSig, this.aym), 'wrong Aym signature')
     }
 
     @method()
@@ -46,4 +50,89 @@ export class Reward extends SmartContract {
         )
     }
 
+    getDeployTx(utxos: UTXO[], initBalance: number): bsv.Transaction {
+        this.balance = initBalance
+        const tx = new bsv.Transaction().from(utxos).addOutput(
+            new bsv.Transaction.Output({
+                script: this.lockingScript,
+                satoshis: initBalance,
+            })
+        )
+        this.lockTo = { tx, outputIndex: 0 }
+        return tx
+    }
+
+    getMultisigTx(
+        userSig: Sig,
+        aymSig: Sig,
+        winner: bsv.PublicKey,
+        prevTx: bsv.Transaction
+    ): bsv.Transaction {
+        const inputIndex = 0
+        return new bsv.Transaction()
+            .addInputFromPrevTx(prevTx)
+            .setInputScript(inputIndex, (tx) => {
+                this.unlockFrom = { tx, inputIndex }
+                return this.getUnlockingScript((self) => {
+                    self.multisig(userSig, aymSig)
+                })
+            })
+            .addOutput(
+                new bsv.Transaction.Output({
+                    script: bsv.Script.buildPublicKeyHashOut(winner),
+                    satoshis: this.balance,
+                })
+            )
+    }
+
+    // Timelock
+    getRefundTx(
+        userSig: Sig,
+        aymSig: Sig,
+        prevTx: bsv.Transaction
+    ): bsv.Transaction {
+        const inputIndex = 0
+        return new bsv.Transaction()
+            .addInputFromPrevTx(prevTx)
+            .setInputScript(inputIndex, (tx) => {
+                this.unlockFrom = { tx, inputIndex }
+                return this.getUnlockingScript((self) => {
+                    self.timelock()
+                })
+            })
+            .addOutput(
+                new bsv.Transaction.Output({
+                    script: bsv.Script.buildPublicKeyHashOut(this.owner),
+                    satoshis: this.balance,
+                })
+            )
+    }
+
+    getDistributionTx(
+        hunters: bsv.PublicKey[],
+        prevTx: bsv.Transaction
+    ): bsv.Transaction {
+        const inputIndex = 0
+        const distributionTx = new bsv.Transaction()
+
+        distributionTx
+            .addInputFromPrevTx(prevTx)
+            .setInputScript(inputIndex, (tx) => {
+                this.unlockFrom = { tx, inputIndex }
+                return this.getUnlockingScript((self) => {
+                    self.timelock()
+                })
+            })
+
+        hunters.forEach((hunter) => {
+            distributionTx.addOutput(
+                new bsv.Transaction.Output({
+                    script: bsv.Script.buildPublicKeyHashOut(hunter),
+                    satoshis: Math.floor(this.balance / hunters.length),
+                })
+            )
+        })
+
+        return distributionTx
+    }
 }
