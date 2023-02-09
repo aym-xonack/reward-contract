@@ -86,11 +86,7 @@ export class Reward extends SmartContract {
     }
 
     // Timelock
-    getRefundTx(
-        userSig: Sig,
-        aymSig: Sig,
-        prevTx: bsv.Transaction
-    ): bsv.Transaction {
+    getRefundTx(prevTx: bsv.Transaction): bsv.Transaction {
         const inputIndex = 0
         return new bsv.Transaction()
             .addInputFromPrevTx(prevTx)
