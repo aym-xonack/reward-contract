@@ -107,32 +107,4 @@ export class Reward extends SmartContract {
                 })
             )
     }
-
-    getDistributionTx(
-        hunters: bsv.PublicKey[],
-        prevTx: bsv.Transaction
-    ): bsv.Transaction {
-        const inputIndex = 0
-        const distributionTx = new bsv.Transaction()
-
-        distributionTx
-            .addInputFromPrevTx(prevTx)
-            .setInputScript(inputIndex, (tx) => {
-                this.unlockFrom = { tx, inputIndex }
-                return this.getUnlockingScript((self) => {
-                    self.timelock()
-                })
-            })
-
-        hunters.forEach((hunter) => {
-            distributionTx.addOutput(
-                new bsv.Transaction.Output({
-                    script: bsv.Script.buildPublicKeyHashOut(hunter),
-                    satoshis: Math.floor(this.balance / hunters.length),
-                })
-            )
-        })
-
-        return distributionTx
-    }
 }
