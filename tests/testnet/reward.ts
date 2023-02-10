@@ -49,8 +49,10 @@ async function multisigTest() {
     const aymSig = Sig('aym')
 
     const unsignedMultisigTx = instance.getMultisigTx(
-        userSig,
-        aymSig,
+        publicKey,
+        privateKey,
+        aymPublicKey,
+        aymPrivateKey,
         winnerPublicKey,
         deployTx
     )

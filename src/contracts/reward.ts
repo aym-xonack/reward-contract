@@ -5,6 +5,8 @@ import {
     prop,
     SmartContract,
     Sig,
+    signTx,
+    toHex,
     bsv,
 } from 'scrypt-ts'
 import { UTXO } from '../types'
@@ -63,18 +65,40 @@ export class Reward extends SmartContract {
     }
 
     getMultisigTx(
-        userSig: Sig,
-        aymSig: Sig,
+        userPublicKey: bsv.PublicKey,
+        userPrivateKey: bsv.PrivateKey,
+        aymPublicKey: bsv.PublicKey,
+        aymPrivateKey: bsv.PrivateKey,
         winner: bsv.PublicKey,
         prevTx: bsv.Transaction
     ): bsv.Transaction {
         const inputIndex = 0
-        return new bsv.Transaction()
-            .addInputFromPrevTx(prevTx)
+
+        const tx = new bsv.Transaction().addInputFromPrevTx(prevTx)
+
+        tx.getSignature(inputIndex)
+        const prevOut = tx.outputs[inputIndex]
+
+        const userSig = signTx(
+            tx,
+            userPrivateKey,
+            prevOut.script,
+            prevOut.satoshis,
+            inputIndex
+        )
+        const aymSig = signTx(
+            tx,
+            aymPrivateKey,
+            prevOut.script,
+            prevOut.satoshis,
+            inputIndex
+        )
+
+        return tx
             .setInputScript(inputIndex, (tx) => {
                 this.unlockFrom = { tx, inputIndex }
                 return this.getUnlockingScript((self) => {
-                    self.multisig(userSig, aymSig)
+                    self.multisig(Sig(userSig as string), Sig(aymSig as string))
                 })
             })
             .addOutput(
