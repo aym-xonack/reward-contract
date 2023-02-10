@@ -65,9 +65,7 @@ export class Reward extends SmartContract {
     }
 
     getMultisigTx(
-        userPublicKey: bsv.PublicKey,
         userPrivateKey: bsv.PrivateKey,
-        aymPublicKey: bsv.PublicKey,
         aymPrivateKey: bsv.PrivateKey,
         winner: bsv.PublicKey,
         prevTx: bsv.Transaction
@@ -110,7 +108,6 @@ export class Reward extends SmartContract {
     }
 
     getPartialMultisigTx(
-        userPublicKey: bsv.PublicKey,
         userPrivateKey: bsv.PrivateKey,
         prevTx: bsv.Transaction
     ): [bsv.Transaction, Sig] {
@@ -135,7 +132,6 @@ export class Reward extends SmartContract {
     getFullMultisigTx(
         partialTx: bsv.Transaction,
         userSig: Sig,
-        aymPublicKey: bsv.PublicKey,
         aymPrivateKey: bsv.PrivateKey,
         winner: bsv.PublicKey
     ): bsv.Transaction {
