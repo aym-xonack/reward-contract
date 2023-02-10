@@ -65,9 +65,7 @@ export class Reward extends SmartContract {
     }
 
     getMultisigTx(
-        userPublicKey: bsv.PublicKey,
         userPrivateKey: bsv.PrivateKey,
-        aymPublicKey: bsv.PublicKey,
         aymPrivateKey: bsv.PrivateKey,
         winner: bsv.PublicKey,
         prevTx: bsv.Transaction

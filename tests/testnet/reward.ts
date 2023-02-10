@@ -45,9 +45,7 @@ async function multisigTest() {
     utxoMgr.collectUtxoFrom(deployTx)
 
     const unsignedMultisigTx = instance.getMultisigTx(
-        publicKey,
         privateKey,
-        aymPublicKey,
         aymPrivateKey,
         winnerPublicKey,
         deployTx
