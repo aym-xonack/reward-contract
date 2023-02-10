@@ -109,6 +109,65 @@ export class Reward extends SmartContract {
             )
     }
 
+    getPartialMultisigTx(
+        userPublicKey: bsv.PublicKey,
+        userPrivateKey: bsv.PrivateKey,
+        prevTx: bsv.Transaction
+    ): [bsv.Transaction, Sig] {
+        const inputIndex = 0
+
+        const tx = new bsv.Transaction().addInputFromPrevTx(prevTx)
+
+        tx.getSignature(inputIndex)
+        const prevOut = tx.outputs[inputIndex]
+
+        const userSig = signTx(
+            tx,
+            userPrivateKey,
+            prevOut.script,
+            prevOut.satoshis,
+            inputIndex
+        )
+
+        return [tx, Sig(userSig as string)]
+    }
+
+    getFullMultisigTx(
+        partialTx: bsv.Transaction,
+        userSig: Sig,
+        aymPublicKey: bsv.PublicKey,
+        aymPrivateKey: bsv.PrivateKey,
+        winner: bsv.PublicKey
+    ): bsv.Transaction {
+        // does input index stay the same?
+        const inputIndex = 0
+
+        partialTx.getSignature(inputIndex)
+        const prevOut = partialTx.outputs[inputIndex]
+
+        const aymSig = signTx(
+            partialTx,
+            aymPrivateKey,
+            prevOut.script,
+            prevOut.satoshis,
+            inputIndex
+        )
+
+        return partialTx
+            .setInputScript(inputIndex, (tx) => {
+                this.unlockFrom = { tx, inputIndex }
+                return this.getUnlockingScript((self) => {
+                    self.multisig(Sig(userSig as string), Sig(aymSig as string))
+                })
+            })
+            .addOutput(
+                new bsv.Transaction.Output({
+                    script: bsv.Script.buildPublicKeyHashOut(winner),
+                    satoshis: this.balance,
+                })
+            )
+    }
+
     // Timelock
     getRefundTx(prevTx: bsv.Transaction): bsv.Transaction {
         const inputIndex = 0
