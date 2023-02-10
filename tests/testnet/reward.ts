@@ -44,10 +44,6 @@ async function multisigTest() {
     // collect the new p2pkh utxo if it exists in `deployTx`
     utxoMgr.collectUtxoFrom(deployTx)
 
-    // TODO: fix dummy sigs
-    const userSig = Sig('user')
-    const aymSig = Sig('aym')
-
     const unsignedMultisigTx = instance.getMultisigTx(
         publicKey,
         privateKey,
