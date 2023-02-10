@@ -80,7 +80,7 @@ export class Reward extends SmartContract {
         const userSig = signTx(
             tx,
             userPrivateKey,
-            prevOut.script,
+            prevOut.script, //Error: inspired by multisig example - https://github.com/sCrypt-Inc/scryptTS-examples/blob/master/src/contracts/multiSig.ts#L72
             prevOut.satoshis,
             inputIndex
         )
