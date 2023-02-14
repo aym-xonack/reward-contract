@@ -59,10 +59,10 @@ async function refundTest() {
     const utxoMgr = await getUtxoManager()
     const utxos = await utxoMgr.getUtxos()
 
-    const futureDeadline = new Date('2030-01-03')
-    const futureDeadlineUnix = BigInt(futureDeadline.valueOf() / 1000)
+    const pastDeadline = new Date('2020-01-03')
+    const pastDeadlineUnix = BigInt(pastDeadline.valueOf() / 1000)
 
-    const instance = new Reward(pubKey, aymPubKey, futureDeadlineUnix)
+    const instance = new Reward(pubKey, aymPubKey, pastDeadlineUnix)
 
     // deploy
     const unsignedDeployTx = instance.getDeployTx(utxos, inputSatoshis)
@@ -73,6 +73,6 @@ async function refundTest() {
 
     const unsignedRefundTx = instance.getRefundTx(deployTx)
     const refundTx = await signAndSend(unsignedRefundTx)
-    console.log('Refund call for ', publicKey, '.')
+    console.log('Refund call for ', publicKey.toString(), '.')
     console.log('TX ID: ', refundTx.id)
 }

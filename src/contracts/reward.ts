@@ -1,5 +1,6 @@
 import {
     assert,
+    bsv,
     method,
     PubKey,
     prop,
@@ -7,7 +8,7 @@ import {
     Sig,
     signTx,
     toHex,
-    bsv,
+    utxoFromOutput,
 } from 'scrypt-ts'
 import { UTXO } from '../types'
 
@@ -60,7 +61,7 @@ export class Reward extends SmartContract {
                 satoshis: initBalance,
             })
         )
-        this.lockTo = { tx, outputIndex: 0 }
+        this.from = { tx, outputIndex: 0 }
         return tx
     }
 
@@ -74,27 +75,24 @@ export class Reward extends SmartContract {
 
         const tx = new bsv.Transaction().addInputFromPrevTx(prevTx)
 
-        tx.getSignature(inputIndex)
-        const prevOut = tx.outputs[inputIndex]
+        const spendingUtxo = utxoFromOutput(prevTx, 0)
 
         const userSig = signTx(
             tx,
             userPrivateKey,
-            prevOut.script, //Error: inspired by multisig example - https://github.com/sCrypt-Inc/scryptTS-examples/blob/master/src/contracts/multiSig.ts#L72
-            prevOut.satoshis,
-            inputIndex
+            bsv.Script.fromString(spendingUtxo.script),
+            spendingUtxo.satoshis
         )
         const aymSig = signTx(
             tx,
             aymPrivateKey,
-            prevOut.script,
-            prevOut.satoshis,
-            inputIndex
+            bsv.Script.fromString(spendingUtxo.script),
+            spendingUtxo.satoshis
         )
 
         return tx
             .setInputScript(inputIndex, (tx) => {
-                this.unlockFrom = { tx, inputIndex }
+                this.to = { tx, inputIndex }
                 return this.getUnlockingScript((self) => {
                     self.multisig(Sig(userSig as string), Sig(aymSig as string))
                 })
@@ -110,17 +108,20 @@ export class Reward extends SmartContract {
     // Timelock
     getRefundTx(prevTx: bsv.Transaction): bsv.Transaction {
         const inputIndex = 0
+        const timeNow = Math.floor(Date.now() / 1000)
+        const ownerPublicKey = new bsv.PublicKey(this.owner)
         return new bsv.Transaction()
             .addInputFromPrevTx(prevTx)
+            .setLockTime(timeNow)
             .setInputScript(inputIndex, (tx) => {
-                this.unlockFrom = { tx, inputIndex }
+                this.to = { tx, inputIndex }
                 return this.getUnlockingScript((self) => {
                     self.timelock()
                 })
             })
             .addOutput(
                 new bsv.Transaction.Output({
-                    script: bsv.Script.buildPublicKeyHashOut(this.owner),
+                    script: bsv.Script.buildPublicKeyHashOut(ownerPublicKey),
                     satoshis: this.balance,
                 })
             )
