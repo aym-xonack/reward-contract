@@ -1,78 +1,65 @@
+import { use } from 'chai'
 import { Reward } from '../../src/contracts/reward'
-import { dummyUTXO, inputSatoshis, signAndSend } from './util/txHelper'
-import { getUtxoManager } from './util/utxoManager'
-import { privateKey } from './util/privateKey'
-import { bsv, PubKey, Sig, toHex } from 'scrypt-ts'
+import { findSig, MethodCallOptions, PubKey, toHex } from 'scrypt-ts'
+import chaiAsPromised from 'chai-as-promised'
+import {
+    getTestnetSigner,
+    inputSatoshis,
+    randomPrivateKey,
+    sleep,
+} from './util/txHelper'
 
-const publicKey = privateKey.publicKey
-const pubKey = PubKey(toHex(publicKey))
+use(chaiAsPromised)
 
-const aymPrivateKey = bsv.PrivateKey.fromRandom('testnet')
-const aymPublicKey = aymPrivateKey.publicKey
-const aymPubKey = PubKey(toHex(aymPublicKey))
+const [ownerPrivateKey, ownerPublicKey, , ,] = randomPrivateKey()
+const [aymPrivateKey, aymPublicKey, , ,] = randomPrivateKey()
+const deadline = Math.round(new Date('2020-01-03').valueOf() / 1000)
 
-const winnerPrivateKey = bsv.PrivateKey.fromRandom('testnet')
-const winnerPublicKey = aymPrivateKey.publicKey
+async function deploy() {
+    await Reward.compile()
+    const reward = new Reward(
+        PubKey(toHex(ownerPublicKey)),
+        PubKey(toHex(aymPublicKey)),
+        BigInt(deadline)
+    )
 
-describe('Test `Reward` SmartContract', () => {
-    before(async () => {
-        await Reward.compile()
-    })
+    await reward.connect(getTestnetSigner([ownerPrivateKey, aymPrivateKey]))
 
-    it('pass - valid multisig unlock', async () => {
-        await multisigTest()
-    })
+    // deploy
+    const deployTx = await reward.deploy(inputSatoshis)
+    console.log('Reward contract deployed: ', deployTx.id)
 
-    it('pass - valid timelock unlock', async () => {
-        await refundTest()
+    return reward
+}
+
+async function multisig() {
+    // deploy
+    const reward = await deploy()
+    // call
+    const { tx: callTx } = await reward.methods.multisig(
+        (sigResps) => findSig(sigResps, ownerPublicKey), // correct userSig
+        (sigResps) => findSig(sigResps, aymPublicKey), // correct aymSig
+        {
+            pubKeyOrAddrToSign: [ownerPublicKey, aymPublicKey],
+        } as MethodCallOptions<Reward>
+    )
+    console.log('Reward `multisig` called: ', callTx.id)
+}
+
+async function timelock() {
+    // deploy
+    const reward = await deploy()
+    // call
+    const { tx: callTx } = await reward.methods.timelock({
+        lockTime: deadline + 86400, // meet the time lock
+    } as MethodCallOptions<Reward>)
+    console.log('Reward `timelock` called: ', callTx.id)
+}
+
+describe('Test SmartContract `Reward` on testnet', () => {
+    it('should succeed', async () => {
+        await multisig()
+        await sleep(5)
+        await timelock()
     })
 })
-
-async function multisigTest() {
-    const utxoMgr = await getUtxoManager()
-    const utxos = await utxoMgr.getUtxos()
-
-    const futureDeadline = new Date('2030-01-03')
-    const futureDeadlineUnix = BigInt(futureDeadline.valueOf() / 1000)
-
-    const instance = new Reward(pubKey, aymPubKey, futureDeadlineUnix)
-
-    // deploy
-    const unsignedDeployTx = instance.getDeployTx(utxos, inputSatoshis)
-    const deployTx = await signAndSend(unsignedDeployTx)
-    console.log('Submit deploy tx:', deployTx.id)
-    // collect the new p2pkh utxo if it exists in `deployTx`
-    utxoMgr.collectUtxoFrom(deployTx)
-
-    const unsignedMultisigTx = instance.getMultisigTx(
-        privateKey,
-        aymPrivateKey,
-        winnerPublicKey,
-        deployTx
-    )
-    const multisigTx = await signAndSend(unsignedMultisigTx)
-    console.log('Multisig call for winner ', winnerPublicKey, '.')
-    console.log('TX ID: ', multisigTx.id)
-}
-
-async function refundTest() {
-    const utxoMgr = await getUtxoManager()
-    const utxos = await utxoMgr.getUtxos()
-
-    const pastDeadline = new Date('2020-01-03')
-    const pastDeadlineUnix = BigInt(pastDeadline.valueOf() / 1000)
-
-    const instance = new Reward(pubKey, aymPubKey, pastDeadlineUnix)
-
-    // deploy
-    const unsignedDeployTx = instance.getDeployTx(utxos, inputSatoshis)
-    const deployTx = await signAndSend(unsignedDeployTx)
-    console.log('Submit deploy tx:', deployTx.id)
-    // collect the new p2pkh utxo if it exists in `deployTx`
-    utxoMgr.collectUtxoFrom(deployTx)
-
-    const unsignedRefundTx = instance.getRefundTx(deployTx)
-    const refundTx = await signAndSend(unsignedRefundTx)
-    console.log('Refund call for ', publicKey.toString(), '.')
-    console.log('TX ID: ', refundTx.id)
-}
