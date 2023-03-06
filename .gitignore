@@ -7,6 +7,8 @@ test/scrypts
 scrypts/
 **/.env
 **/scrypt.index.json
+.eslintcache
 .vscode/*
 !.vscode/launch.json
 !.vscode/tasks.json
+!.vscode/settings.json

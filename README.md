@@ -1,4 +1,4 @@
-# Locking Contract
+# Reward2
 
 ## Build
 
