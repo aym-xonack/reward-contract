@@ -17,6 +17,11 @@
     "lint-check": "eslint . --ext .js,.ts && prettier --check --ignore-unknown \"**/*\"",
     "prepare": "husky install"
   },
+  "files": [
+    "dist",
+    "scrypt.index.json",
+    "scrypts"
+  ],
   "lint-staged": {
     "**/*": [
       "prettier --write --ignore-unknown"
